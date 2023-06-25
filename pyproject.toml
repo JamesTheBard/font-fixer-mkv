@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "font-fixer-mkv"
+version = "0.1.0"
+description = "A quick script to add missing fonts to video files based on the associated subtitles."
+authors = ["JamesTheBard"]
+license = "GPLv3"
+readme = "README.md"
+packages = [{include = "font_fixer_mkv"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fonttools = "^4.40.0"
+wcmatch = "^8.4.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
