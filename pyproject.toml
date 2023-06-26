@@ -12,6 +12,7 @@ python = "^3.10"
 fonttools = "^4.40.0"
 wcmatch = "^8.4.1"
 python-box = "^7.0.1"
+rich = "^13.4.2"
 
 
 [build-system]
