@@ -1,8 +1,10 @@
 import sys
 import re
+import tomllib
 from typing import List, NamedTuple, Union
+from dataclasses import dataclass
 
-from fontTools import ttLib
+from fontTools import ttLib, otlLib
 from wcmatch.pathlib import Path
 
 FONT_FAMILY_SPECIFIER = 1
@@ -10,7 +12,8 @@ FONT_SUBFAMILY_SPECIFIER = 2
 FONT_NAME_SPECIFIER = 4
 
 
-class Font(NamedTuple):
+@dataclass
+class Font:
     name: str
     family: str
     subfamily: list
@@ -51,9 +54,15 @@ class SubtitleInfo:
             style_info = Style(style=s, family=family, subfamily=subfamily)
             self.styles.append(style_info)
 
-
 def get_info(font_file: Union[Path, str]) -> Font:
+    if font_file.suffix.lower() == ".ttf":
+        return get_ttf_info(font_file)
+    if font_file.suffix.lower() == ".otf":
+        return get_ttf_info(font_file)
+    
+def get_ttf_info(font_file: Union[Path, str]) -> Font:
     ignore_subfamily = Path(f"{str(font_file)}.all_styles").exists()
+    override = Path(f"{str(font_file)}.override")
     font = ttLib.TTFont(str(font_file))
     name = str()
     family = str()
@@ -76,23 +85,34 @@ def get_info(font_file: Union[Path, str]) -> Font:
                 subfamily = record.string
         if name and family and subfamily:
             break
+
     subfamily = [
         i if i != "Oblique" else "Italic" for i in subfamily.decode().split(" ")
     ]
-    return Font(
-        name=name.decode(),
-        family=family.decode(),
+
+    f = Font(
+        name=name.decode() if type(name) == bytes else name,
+        family=family.decode() if type(name) == bytes else family,
         subfamily=subfamily,
         file=font_file,
         ignore_subfamily=ignore_subfamily,
     )
 
+    if override.exists():
+        with override.open('rb') as g:
+            o_content = tomllib.load(g)
+        for i in o_content.keys():
+            print(o_content[i])
+            setattr(f, i, o_content[i])
 
-def generate_font_map(font_directory: Path) -> List[Font]:
+    return f
+            
+
+def generate_font_map(font_directory: Union[Path, str]) -> List[Font]:
     font_directory = Path(font_directory)
     font_map = list()
     for file in font_directory.iterdir():
-        if file.suffix == ".ttf":
+        if file.suffix.lower() in [".ttf", ".otf"]:
             font_map.append(get_info(file))
     return font_map
 
@@ -103,14 +123,24 @@ def generate_style_map(subtitle_file: Union[Path, str]) -> List[Style]:
     return header_style_map
 
 
+def generate_style_map_from_content(content: List[str]) -> List[Style]:
+    header_style_map = get_styles_from_headers_content(content)
+    header_style_map.extend(get_styles_from_override_codes_content(content))
+    return header_style_map
+
+
 def get_styles_from_override_codes(subtitle_file: Union[Path, str]) -> List[Style]:
     subtitle_file = Path(subtitle_file)
     with subtitle_file.open("r") as f:
         subtitles = f.readlines()
+    return get_styles_from_override_codes_content(subtitles)
+    
+
+def get_styles_from_override_codes_content(content: List[str]) -> List[Style]:
     regex = r'\{.*?\\fn(.+?)(?:}|\\)'
     r = re.compile(regex)
     override_fonts = list()
-    for i in subtitles:
+    for i in content:
         a = r.findall(i)
         if a:
             override_fonts.append(a[0])
@@ -122,7 +152,11 @@ def get_styles_from_headers(subtitle_file: Union[Path, str]) -> List[Style]:
     subtitle_file = Path(subtitle_file)
     with subtitle_file.open("r") as f:
         subtitles = f.readlines()
-    subtitles = [i for i in subtitles if i.startswith("Style: ")]
+    return get_styles_from_headers_content(subtitles)
+    
+
+def get_styles_from_headers_content(content: List[str]) -> List[Style]:
+    subtitles = [i for i in content if i.startswith("Style: ")]
     styles = [i.split(",") for i in subtitles]
     style_map = list()
     for style in styles:

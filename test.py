@@ -1,5 +1,5 @@
-from font_fixer.helpers.font import (FontNotFoundError, generate_font_list,
-                                     generate_font_map, generate_style_map)
+from font_fixer.fonts import (FontNotFoundError, generate_font_list,
+                              generate_font_map, generate_style_map)
 
 font_map = generate_font_map("fonts")
 style_map = generate_style_map("videos/subs2.ass")
