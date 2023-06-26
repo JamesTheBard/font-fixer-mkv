@@ -21,38 +21,39 @@ class Font:
     ignore_subfamily: bool
 
 
-class Style(NamedTuple):
+@dataclass
+class Style:
     style: str
     family: str
     subfamily: list
 
 
-class SubtitleInfo:
-    input_file: Path
-    styles: List[Style]
+# class SubtitleInfo:
+#     input_file: Path
+#     styles: List[Style]
 
-    def __init__(self, input_file: Union[str, List]):
-        self.input_file = Path(input_file)
-        self.styles = list()
-        self.__generate_style_map()
+#     def __init__(self, input_file: Union[str, List]):
+#         self.input_file = Path(input_file)
+#         self.styles = list()
+#         self.__generate_style_map()
 
-    def __generate_style_map(self) -> None:
-        with self.input_file.open("r") as f:
-            subtitles = f.readlines()
-        subtitles = [i for i in subtitles if i.startswith("Style: ")]
-        styles = [i.split(",") for i in subtitles]
-        for style in styles:
-            subfamily = list()
-            s = style[0].split(": ")[1]
-            family = style[1]
-            if int(style[7]):
-                subfamily.append("Bold")
-            if int(style[8]):
-                subfamily.append("Italic")
-            if not subfamily:
-                subfamily.append("Regular")
-            style_info = Style(style=s, family=family, subfamily=subfamily)
-            self.styles.append(style_info)
+#     def __generate_style_map(self) -> None:
+#         with self.input_file.open("r") as f:
+#             subtitles = f.readlines()
+#         subtitles = [i for i in subtitles if i.startswith("Style: ")]
+#         styles = [i.split(",") for i in subtitles]
+#         for style in styles:
+#             subfamily = list()
+#             s = style[0].split(": ")[1]
+#             family = style[1]
+#             if int(style[7]):
+#                 subfamily.append("Bold")
+#             if int(style[8]):
+#                 subfamily.append("Italic")
+#             if not subfamily:
+#                 subfamily.append("Regular")
+#             style_info = Style(style=s, family=family, subfamily=subfamily)
+#             self.styles.append(style_info)
 
 def get_info(font_file: Union[Path, str]) -> Font:
     if font_file.suffix.lower() == ".ttf":
@@ -137,15 +138,50 @@ def get_styles_from_override_codes(subtitle_file: Union[Path, str]) -> List[Styl
     
 
 def get_styles_from_override_codes_content(content: List[str]) -> List[Style]:
-    regex = r'\{.*?\\fn(.+?)(?:}|\\)'
-    r = re.compile(regex)
-    override_fonts = list()
+    temp_style_map = get_styles_from_headers_content(content)
+    font_override_regex = r'\{.*?\\fn(.+?)(?:}|\\)'
+    font_italics_regex = r'\{.*?\\i1(?:}|\\)'
+    font_bold_regex = r'\{.*?\\b1(?:}|\\)'
+
+    r_override = re.compile(font_override_regex)
+    r_italics = re.compile(font_italics_regex)
+    r_bold = re.compile(font_bold_regex)
+
+    style_map = list()
+    data_section = False
     for i in content:
-        a = r.findall(i)
-        if a:
-            override_fonts.append(a[0])
-    override_fonts = list(set(override_fonts))
-    return [Style(family=f, subfamily=['Regular'], style=f'Override:{f}') for f in override_fonts]
+        if not i.startswith('Dialogue'):
+            continue
+        style = i.split(",")[3]
+        subfamily = ["Regular"]
+        o = r_override.findall(i)
+        bold = r_bold.findall(i)
+        italics = r_italics.findall(i)
+        if bold or italics:
+            subfamily = list()
+            if bold:
+                subfamily.append('Bold')
+            if italics:
+                subfamily.append('Italic')
+        s = [i for i in temp_style_map if i.style == style][0]
+        if o:
+            style_override = Style(family=o[0], subfamily=s.subfamily, style=f'FOverride:{style}:{"+".join(s.subfamily)}')
+            style_map.append(style_override)
+            subfamily = list(set(subfamily) | set(s.subfamily))
+            if "Regular" in subfamily and len(subfamily) > 1:
+                subfamily.remove("Regular")
+            if set(s.subfamily) != set(subfamily):
+                style_map.append(Style(family=o[0], subfamily=subfamily, style=f'FOverride:{style}:{"+".join(subfamily)}'))
+        elif style and (italics or bold):
+            if s.subfamily == subfamily:
+                continue
+            subfamily = list(set(subfamily) | set(s.subfamily))
+            if "Regular" in subfamily and len(subfamily) > 1:
+                subfamily.remove("Regular")
+            j = Style(family=s.family, subfamily=subfamily, style=f'SOverride:{style}:{"+".join(subfamily)}')
+            style_map.append(j)
+            
+    return style_map
 
 
 def get_styles_from_headers(subtitle_file: Union[Path, str]) -> List[Style]:
@@ -208,5 +244,10 @@ class FontError(Exception):
 
 class FontNotFoundError(FontError):
     def __init__(self, style: Style, message: str = "Font file missing for a Style."):
+        self.message = message
+        self.style = style
+
+class FontMultpleFoundError(FontError):
+    def __init__(self, style: Style, message: str = "Multiple fonts found for a Style."):
         self.message = message
         self.style = style

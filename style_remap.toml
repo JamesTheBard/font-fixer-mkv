@@ -1,0 +1,31 @@
+# [Arial.Regular]
+# family = "Bolton"
+# subfamily = [ "Regular" ]
+
+# [Arial.Bold]
+# family = "Roboto Medium"
+# subfamily = [ "Bold" ]
+
+["LTFinnegan Medium".Bold]
+family = "LTFinnegan Medium"
+subfamily = [ 'Regular' ]
+
+["LTFinnegan Medium".Italic]
+family = "LTFinnegan Medium"
+subfamily = [ 'Regular' ]
+
+["LTFinnegan Medium".Bold_Italic]
+family = "LTFinnegan Medium"
+subfamily = [ 'Regular' ]
+
+["A-OTF Jun Pro 34-Kami".Regular]
+family = "A-OTF Jun Pro"
+subfamily = [ '34-Kami' ]
+
+["Arial Rounded MT".Bold]
+family = "Arial Rounded MT Bold"
+subfamily = [ 'Regular' ]
+
+["Mesouran Serif Black SSi".Regular]
+family = "Mesouran Serif Black SSi"
+subfamily = [ 'Bold' ]
